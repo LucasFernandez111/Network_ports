@@ -1,0 +1,49 @@
+#!/bin/bash
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+filter_pid=""
+
+while getopts "f:" opt; do
+    case $opt in
+        f)
+            filter_pid="$OPTARG"
+            ;;
+        \?)
+            echo -e "${RED}Invalid option: -$OPTARG${NC}" >&2
+            exit 1
+            ;;
+    esac
+done
+
+list_ports_windows() {
+    echo -e "${BLUE}\nUsed ports and associated services (Windows):${NC}\n"
+    netstat -ano | findstr LISTENING | while read -r line; do
+        pid=$(echo "$line" | awk '{print $5}')
+        port=$(echo "$line" | awk '{print $1}')
+        if [[ -z "$filter_pid" || "$pid" == "$filter_pid" ]]; then
+            printf "${GREEN}Port: %s ${CYAN}PID: %s${NC}\n" "$port" "$pid"
+        fi
+    done
+}
+
+list_ports_linux() {
+    echo -e "${BLUE}\nUsed ports and associated services (Linux):${NC}\n"
+    sudo netstat -tuln | awk 'NR>2 {printf "'"$GREEN"'Port: %s ${CYAN}PID: %s ${YELLOW}Service: %s${NC}\n", $4, $7, $9}' | sort
+}
+
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    list_ports_linux
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    echo -e "${RED}This script is not tested on macOS.${NC}"
+elif [[ "$OSTYPE" == "cygwin" || "$OSTYPE" == "msys" ]]; then
+    list_ports_windows
+else
+    echo -e "${RED}Unsupported OS: $OSTYPE${NC}"
+    exit 1
+fi
